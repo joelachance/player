@@ -1,5 +1,6 @@
 [
   { "name": "default", "label": "Default" },
   { "name": "midnight", "label": "Midnight" },
-  { "name": "cassette", "label": "Cassette" }
+  { "name": "cassette", "label": "Cassette" },
+  { "name": "terminal", "label": "Terminal" }
 ]

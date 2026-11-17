@@ -1,0 +1,23 @@
+/* The Terminal skin after step 1 of the README walk-through: properties
+   only. Used for the README screenshot; the finished skin is
+   skins/terminal.css. */
+
+:host {
+  color-scheme: dark;
+  --page: #050805;
+  --panel: #0b120b;
+  --text: #b6f5b0;
+  --muted: #5d8a5a;
+  --accent: #39ff14;
+  --accent-text: #050805;
+  --track: #1a2b19;
+  --danger: #ff6b6b;
+  --radius: 4px;
+  --font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --border: 1px solid #2c4a2a;
+  --button-radius: 2px;
+  --field-radius: 2px;
+  --track-radius: 0;
+  --thumb-radius: 0;
+}

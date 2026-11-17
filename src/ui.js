@@ -85,6 +85,7 @@ export function wire(root, host, player, options) {
       ...player.tracks.map((track, index) => {
         const item = document.createElement('li');
         item.className = 'track';
+        item.part = index === player.index ? 'track current' : 'track';
         if (index === player.index) item.setAttribute('aria-current', 'true');
 
         const play = document.createElement('button');
@@ -93,9 +94,11 @@ export function wire(root, host, player, options) {
         play.addEventListener('click', () => player.play(index));
         const title = document.createElement('span');
         title.className = 'track__title';
+        title.part = 'track-title';
         title.textContent = track.title;
         const detail = document.createElement('span');
         detail.className = 'track__detail';
+        detail.part = 'track-detail';
         detail.textContent = track.detail;
         play.append(title, detail);
         item.append(play);
@@ -104,6 +107,7 @@ export function wire(root, host, player, options) {
           const remove = document.createElement('button');
           remove.type = 'button';
           remove.className = 'track__remove';
+          remove.part = 'track-remove';
           remove.setAttribute('aria-label', `Remove ${track.title}`);
           remove.textContent = '×';
           remove.addEventListener('click', () => player.remove(index));

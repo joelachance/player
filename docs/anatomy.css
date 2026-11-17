@@ -1,0 +1,77 @@
+/* A skin that outlines and numbers every class, for the README's map of
+   the player. It is the default skin's properties plus the markers. */
+
+:host {
+  --page: #f2f1ee;
+  --panel: #ffffff;
+  --text: #1c1b19;
+  --muted: #77736b;
+  --accent: #d9480f;
+  --accent-text: #ffffff;
+  --track: #e7e4de;
+  --danger: #c92a2a;
+  --radius: 20px;
+  --font: 15px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-title: 600 1.2em/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  --shadow: 0 12px 40px rgb(0 0 0 / 0.08);
+  --width: 520px;
+  --gap: 26px;
+  --gap-large: 34px;
+
+  --mark: #1d4ed8;
+}
+
+.player, .player__now, .player__title, .player__detail, .player__seek, .player__time:first-child,
+.player__controls, #prev, .btn--main, .player__volume, .player__add, .btn--text:last-child,
+.player__list, .track:first-child, .track:first-child .track__title, .track:first-child .track__detail,
+.track:first-child .track__remove, .player__footer {
+  position: relative;
+  overflow: visible;
+  outline: 1px dashed var(--mark);
+  outline-offset: 3px;
+}
+
+.player::before, .player__now::before, .player__title::before, .player__detail::before, .player__seek::before,
+.player__time:first-child::before, .player__controls::before, #prev::before, .btn--main::before,
+.player__volume::before, .player__add::before, .btn--text:last-child::before, .player__list::before,
+.track:first-child::before, .track:first-child .track__title::before, .track:first-child .track__detail::before,
+.track:first-child .track__remove::before, .player__footer::before {
+  position: absolute;
+  z-index: 1;
+  top: -12px;
+  left: -12px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  box-sizing: border-box;
+  border-radius: 9px;
+  background: var(--mark);
+  color: #fff;
+  font: 700 10px/17px system-ui, sans-serif;
+  text-align: center;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.player::before { content: "1"; top: -9px; left: 24px; }
+.player__now::before { content: "2"; left: auto; right: -12px; }
+.player__title::before { content: "3"; }
+.player__detail::before { content: "4"; top: auto; bottom: -12px; left: 120px; }
+.player__seek::before { content: "5"; left: auto; right: -12px; }
+.player__time:first-child::before { content: "6"; }
+.player__controls::before { content: "7"; left: 50%; }
+#prev::before { content: "8"; }
+.btn--main::before { content: "9"; left: auto; right: -12px; }
+.player__volume::before { content: "10"; left: auto; right: -12px; }
+.player__add::before { content: "11"; left: 45%; }
+.btn--text:last-child::before { content: "12"; left: auto; right: -12px; }
+.player__list::before { content: "13"; top: auto; bottom: -12px; left: 50%; }
+.track:first-child::before { content: "14"; left: 45%; top: -10px; }
+.track:first-child .track__title::before { content: "15"; top: -13px; left: -16px; }
+.track:first-child .track__detail::before { content: "16"; top: 0; left: auto; right: -22px; }
+.track:first-child .track__remove::before { content: "17"; left: auto; right: -12px; }
+.player__footer::before { content: "18"; left: 24px; }
+
+.player__list { max-height: none; }
+.track__play { overflow: visible; }
+.track__title, .track__detail { justify-self: start; }

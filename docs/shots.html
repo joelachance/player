@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Player screenshots</title>
+  <!-- The pages the README's pictures are taken from; see docs/shots.sh.
+       ?shot=skins | anatomy | steps | page -->
+  <style>
+    body { margin: 0; display: flex; align-items: flex-start; font: 13px/1.4 system-ui, sans-serif; }
+    figure { margin: 0; padding: 14px 28px 30px; background: var(--page); flex: 1; }
+    figcaption { padding: 0 0 12px; text-align: center; font-weight: 600; opacity: 0.7; color: var(--text); }
+    wav-player { width: 420px; margin: 0 auto; }
+    body.anatomy wav-player { width: 520px; }
+    body.anatomy figure { padding: 34px 40px 40px; }
+
+    /* ?shot=page: the embedding page restyles the player without a skin file. */
+    body.page wav-player {
+      --accent: #7c3aed;
+      --radius: 0;
+      --track: #ede9fe;
+      --shadow: 8px 8px 0 #7c3aed;
+    }
+    body.page wav-player::part(title) { font-family: Georgia, serif; font-style: italic; font-size: 24px; }
+    body.page wav-player::part(toggle) { border-radius: 0; }
+    body.page wav-player::part(current) { background: none; border-radius: 0; box-shadow: inset 4px 0 0 #7c3aed; }
+    body.page wav-player::part(track-remove) { display: none; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import '../src/element.js';
+
+    const shot = new URLSearchParams(location.search).get('shot') ?? 'skins';
+    document.body.className = shot;
+    const sets = {
+      skins: [['default', 'Default'], ['midnight', 'Midnight'], ['cassette', 'Cassette'], ['terminal', 'Terminal']],
+      anatomy: [['docs/anatomy.css']],
+      steps: [['default', '1. Copy default.css'], ['docs/terminal-step1.css', '2. Change the properties'], ['terminal', '3. Add rules of your own']],
+      page: [['default']],
+    };
+
+    for (const [skin, caption] of sets[shot]) {
+      const figure = document.createElement('figure');
+      if (caption) figure.append(Object.assign(document.createElement('figcaption'), { textContent: caption }));
+      const player = document.createElement('wav-player');
+      player.setAttribute('skin', skin.includes('/') ? new URL(`../${skin}`, import.meta.url).href : skin);
+      player.setAttribute('editable', '');
+      if (shot === 'anatomy') player.setAttribute('skin-menu', '');
+      for (const [href, title] of [
+        ['https://example.com/takes/kick-01.wav', 'kick-01.wav'],
+        ['s3://my-takes/session-4/snare.wav', 'snare.wav'],
+        ['https://example.com/takes/room-tone.wav', 'room-tone.wav'],
+      ]) {
+        player.appendChild(Object.assign(document.createElement('a'), { textContent: title })).setAttribute('href', href);
+      }
+      figure.append(player);
+      document.body.append(figure);
+
+      // Pose it mid-song without loading audio: first track current, a third played.
+      const root = player.shadowRoot;
+      player.player.index = 0;
+      player.player.dispatchEvent(new Event('track'));
+      root.querySelector('.player').dataset.state = 'playing';
+      root.getElementById('seek').disabled = false;
+      root.getElementById('seek').value = 0.35;
+      root.getElementById('seek').style.setProperty('--fill', '35%');
+      root.getElementById('elapsed').textContent = '0:42';
+      root.getElementById('duration').textContent = '2:03';
+
+      // The figure takes the skin's page colour, which lives on the element.
+      const paint = () => {
+        const style = getComputedStyle(player);
+        figure.style.setProperty('--page', style.getPropertyValue('--page'));
+        figure.style.setProperty('--text', style.getPropertyValue('--text'));
+      };
+      if (shot === 'anatomy') setTimeout(() => (root.getElementById('skins').value = 'default'), 500);
+      root.getElementById('skin').addEventListener('load', paint);
+      paint();
+    }
+  </script>
+</body>
+</html>

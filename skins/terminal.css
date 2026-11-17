@@ -1,0 +1,32 @@
+/* Terminal: the worked example from the README's "Make your own skin".
+   Step 1 is the properties; step 2 is the handful of rules below them. */
+
+:host {
+  color-scheme: dark;
+  --page: #050805;
+  --panel: #0b120b;
+  --text: #b6f5b0;
+  --muted: #5d8a5a;
+  --accent: #39ff14;
+  --accent-text: #050805;
+  --track: #1a2b19;
+  --danger: #ff6b6b;
+  --radius: 4px;
+  --font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --border: 1px solid #2c4a2a;
+  --button-radius: 2px;
+  --field-radius: 2px;
+  --track-radius: 0;
+  --thumb-radius: 0;
+}
+
+/* Step 2: rules of its own, written against the class names. */
+.player__title::before { content: "> "; color: var(--accent); }
+.player[data-state="playing"] .player__title::after { content: " _"; animation: blink 1s steps(2) infinite; }
+.btn--main { border-radius: 2px; box-shadow: 0 0 18px rgb(57 255 20 / 0.45); }
+.track[aria-current="true"] { background: none; box-shadow: inset 2px 0 0 var(--accent); }
+.track__detail { text-transform: uppercase; letter-spacing: 0.08em; }
+
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .player__title::after { animation: none; } }

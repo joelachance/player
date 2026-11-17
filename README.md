@@ -18,7 +18,7 @@ node --test                         # tests
 | --- | --- |
 | Files on disk | **Open files**, or drop them on the page |
 | A folder on disk | Start the server with `--dir`; its WAVs (one level of subfolders deep) fill the playlist |
-| S3 | Type `s3://bucket/path/take.wav` and press **Add** |
+| S3 | Type `s3://bucket/path/take.wav`, or paste the object's address from the AWS console, and press **Add** |
 | Any web address | Type `https://…/take.wav` and press **Add** |
 
 Space plays and pauses. Previous goes back to the start of the track first,
@@ -26,22 +26,41 @@ then to the track before.
 
 ### S3
 
-For an `s3://` address the page asks the local server for a presigned
-address, good for an hour, and plays that. A fresh one is signed every time
-the track starts, so a playlist left open overnight still works. Your keys
-stay in the server process and never reach the browser.
+For an S3 object the page asks the local server for a presigned address,
+good for an hour, and plays that. A fresh one is signed every time the track
+starts, so a playlist left open overnight still works. Your keys stay in the
+server process and never reach the browser.
 
-The server finds credentials the way the AWS tools do:
+Any of these names the object:
 
-1. `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (and `AWS_SESSION_TOKEN`) in the environment, or else
-2. whatever the AWS CLI resolves (`AWS_PROFILE`, SSO, and so on), through
-   `aws configure export-credentials`.
+```
+s3://my-bucket/takes/kick.wav
+arn:aws:s3:::my-bucket/takes/kick.wav
+https://my-bucket.s3.us-west-2.amazonaws.com/takes/kick.wav      (the console's "Object URL")
+https://us-west-2.console.aws.amazon.com/s3/object/my-bucket?…   (the object's console page)
+```
 
-The bucket's region is looked up for you; `AWS_REGION` is the fallback. The
-credentials need `s3:GetObject` on the object.
+What has to be in place:
 
-With no credentials, the object is tried as a public one at
-`https://bucket.s3.amazonaws.com/key`.
+1. **An object to play.** To put a test file up:
+   `aws s3 cp take.wav s3://my-bucket/takes/take.wav`
+2. **Credentials where the server runs.** It looks for
+   `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` (and `AWS_SESSION_TOKEN`) in
+   the environment, or else asks the AWS CLI, which covers `AWS_PROFILE`
+   and SSO. Check with `aws sts get-caller-identity`; if an SSO login has
+   lapsed, `aws sso login`.
+3. **Permission.** Those credentials need `s3:GetObject` on the object, and
+   `kms:Decrypt` if the bucket encrypts with a KMS key.
+
+Nothing else: no bucket policy, no public access and no CORS rule. The
+bucket's region is looked up for you; `AWS_REGION` is the fallback.
+
+Before handing an address to the browser the server reads the first byte
+itself, so when S3 refuses, the player says why (no such object, access
+denied, session expired, wrong credentials, archived in Glacier) instead of
+only failing to load. The same line is printed in the server's terminal.
+
+With no credentials at all, the object is tried as a public one.
 
 The server listens on `127.0.0.1` only and answers only to `localhost`,
 because it will sign for anything your credentials can read.
@@ -112,32 +131,135 @@ Things to know when hosting it:
 
 ## Skins
 
+![The four skins that ship with the player](docs/skins.png)
+
 `skins/base.css` is layout and nothing else. Every colour, font, radius and
-shadow is a custom property that a skin sets on `:host`. To make one:
+shadow is a custom property that a skin sets on `:host`, and a skin may add
+rules of its own against the class names below. Use one with
+`<wav-player skin="midnight">` or pick it in the Skin menu.
 
-1. Copy `skins/default.css` to `skins/yours.css`. It lists every property:
-   ten required ones, and the optional ones with their fallbacks.
-2. Change the values. Add rules of your own below them if properties are not
-   enough; `skins/cassette.css` does.
-3. Add `{ "name": "yours", "label": "Yours" }` to `skins/skins.json`.
+### Make your own skin
 
-It then shows in the Skin menu and works as `skin="yours"`. The standalone
-page remembers the choice, and `http://localhost:4173/?skin=yours` opens
-with it. A skin need not live in this folder: `skin="https://…/mine.css"`
-loads any sheet written the same way.
+![Default, then properties changed, then rules added](docs/steps.png)
 
-Hooks a skin can style on:
+**1. Copy `skins/default.css` to `skins/terminal.css`.** It lists every
+property a skin can set: ten required ones, then the optional ones with
+their fallbacks.
 
-- `.player[data-state]` is `idle`, `loading`, `playing` or `paused`.
-- `.player--error` is set while a track has failed; `.player--drop` while
-  files are dragged over the player.
-- `.track[aria-current="true"]` is the current track in the list.
-- Sliders carry `--fill`, from `0%` to `100%`, for the played part.
-- Icons are inline SVG filled with `currentColor`.
+**2. Change the properties.** This much is the whole middle picture:
+
+```css
+:host {
+  color-scheme: dark;
+  --page: #050805;          /* behind the player */
+  --panel: #0b120b;         /* the player itself */
+  --text: #b6f5b0;
+  --muted: #5d8a5a;         /* times, details, placeholders */
+  --accent: #39ff14;        /* play button, played part of sliders, current track */
+  --accent-text: #050805;   /* icon on the play button */
+  --track: #1a2b19;         /* unplayed part of sliders, quiet buttons */
+  --danger: #ff6b6b;        /* error text */
+  --radius: 4px;            /* corners of the player */
+  --font: 14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+  --border: 1px solid #2c4a2a;
+  --button-radius: 2px;
+  --field-radius: 2px;
+  --track-radius: 0;
+  --thumb-radius: 0;
+}
+```
+
+**3. Add rules of your own** where properties are not enough. These five
+lines make the right-hand picture:
+
+```css
+.player__title::before { content: "> "; color: var(--accent); }
+.player[data-state="playing"] .player__title::after { content: " _"; }
+.btn--main { box-shadow: 0 0 18px rgb(57 255 20 / 0.45); }
+.track[aria-current="true"] { background: none; box-shadow: inset 2px 0 0 var(--accent); }
+.track__detail { text-transform: uppercase; letter-spacing: 0.08em; }
+```
+
+**4. Register it** by adding `{ "name": "terminal", "label": "Terminal" }`
+to `skins/skins.json`. It now shows in the Skin menu and works as
+`skin="terminal"`. The standalone page remembers the choice, and
+`http://localhost:4173/?skin=terminal` opens with it.
+
+The finished file is `skins/terminal.css`. A skin need not live in this
+folder: `skin="https://…/mine.css"` loads any sheet written the same way.
+
+### Class names
+
+![The player with each class outlined and numbered](docs/anatomy.png)
+
+Every piece has a class, for skin files, and a part name, for the page the
+player is embedded in. Both are safe to rely on.
+
+| # | Class | Part | What it is |
+| --- | --- | --- | --- |
+| 1 | `.player` | `player` | The panel. Carries `data-state` |
+| 2 | `.player__now` | `now` | Now-playing block |
+| 3 | `.player__title` | `title` | Track title |
+| 4 | `.player__detail` | `detail` | Where the track is from, or the error |
+| 5 | `.player__seek` | `seek` | Row with the times and the seek slider |
+| 6 | `.player__time` | `time`, plus `elapsed` or `duration` | The two times |
+| 7 | `.player__controls` | `controls` | Row of buttons and volume |
+| 8 | `.btn` | `button`, plus `prev` or `next` | Any button |
+| 9 | `.btn--main` | `toggle` | Play / pause. Holds `.icon-play` and `.icon-pause` |
+| 10 | `.player__volume` | `volume` | Speaker icon and volume slider |
+| 11 | `.player__add` | `add` | Address box, Add and Open files (`editable` only) |
+| 12 | `.btn--text` | `text-button` | Buttons with words on them |
+| 13 | `.player__list` | `list` | The playlist |
+| 14 | `.track` | `track`, plus `current` on the current one | One row. The current one has `aria-current="true"` |
+| 15 | `.track__title` | `track-title` | Its title |
+| 16 | `.track__detail` | `track-detail` | Its source |
+| 17 | `.track__remove` | `track-remove` | Its remove button (`editable` only) |
+| 18 | `.player__footer` | `footer` | Skin menu (`skin-menu` only) |
+| | `input[type="range"]` | `slider`, plus `seek-slider` or `volume-slider` | Both sliders. `--fill` runs `0%` to `100%` for the played part |
+| | `.player__add input` | `field` | The address box |
+| | `.track__play` | | The clickable part of a row, around 15 and 16 |
+| | `.player__empty` | `empty` | "Drop WAV files here", shown when the list is empty |
+
+States to style on:
+
+- `.player[data-state="idle"]`, `"loading"`, `"playing"` or `"paused"`.
+- `.player--error` while a track has failed; `.player--drop` while files are
+  dragged over the player.
+- `.track[aria-current="true"]` for the current track.
+- Icons are inline SVG filled with `currentColor`, so `color` recolours them.
+
+### Styling from the page, without a skin file
+
+![The default skin restyled by the embedding page](docs/page.png)
+
+The page a player is embedded in can restyle it with its own CSS: set the
+same custom properties on the element, and reach single pieces through
+`::part()` with the part names above.
+
+```css
+wav-player {
+  --accent: #7c3aed;
+  --radius: 0;
+  --track: #ede9fe;
+  --shadow: 8px 8px 0 #7c3aed;
+}
+wav-player::part(title) { font-family: Georgia, serif; font-style: italic; font-size: 24px; }
+wav-player::part(toggle) { border-radius: 0; }
+wav-player::part(current) { background: none; border-radius: 0; box-shadow: inset 4px 0 0 #7c3aed; }
+wav-player::part(track-remove) { display: none; }
+```
+
+Parts take states too: `wav-player::part(button):hover`. A part cannot reach
+inside another, so a rule such as "the title inside the current track" goes
+in a skin file instead.
 
 To go further than CSS, change `src/markup.js`: `src/ui.js` finds elements
 by id, and `src/player.js` knows nothing about the page, so it can drive
 markup of your own.
+
+The pictures here are taken from `docs/shots.html`; `sh docs/shots.sh`
+retakes them after a change.
 
 ## Layout
 
@@ -151,6 +273,7 @@ src/player.js     Player: a playlist over one <audio> element, with events
 src/sources.js    turns files, folder entries and addresses into tracks
 src/s3.js         s3:// parsing, shared by the page and the server
 skins/            base.css, one file per skin, skins.json
+docs/             the README's pictures and the page they are taken from
 server.js         static files, --dir folder, /api/presign
 lib/presign.js    Signature Version 4 presigning, credentials, bucket region
 test/             node --test
