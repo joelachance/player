@@ -2,7 +2,7 @@
    can set is listed here. The first block is required; the second is
    optional and shows the value base.css falls back to. */
 
-:root {
+:host {
   --page: #f2f1ee;            /* behind the player */
   --panel: #ffffff;           /* the player itself */
   --text: #1c1b19;

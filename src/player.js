@@ -77,6 +77,20 @@ export class Player extends EventTarget {
     this.#emit('tracks');
   }
 
+  clear() {
+    if (!this.tracks.length) return;
+    this.tracks = [];
+    this.audio.pause();
+    this.audio.removeAttribute('src');
+    this.audio.load();
+    this.index = -1;
+    this.error = null;
+    this.starting += 1;
+    this.#state('idle');
+    this.#emit('track');
+    this.#emit('tracks');
+  }
+
   async play(index = this.index) {
     const track = this.tracks[index];
     if (!track) return;

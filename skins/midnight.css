@@ -1,6 +1,6 @@
 /* Midnight: a dark skin made of nothing but the required properties and a shadow. */
 
-:root {
+:host {
   color-scheme: dark;
   --page: #0c0e14;
   --panel: #161a24;

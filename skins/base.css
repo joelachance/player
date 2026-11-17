@@ -4,23 +4,35 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: var(--page);
+/* The element itself. `all: initial` stops the host page's inherited text
+   styles from seeping in; the page can still size and place the element. */
+:host {
+  all: initial;
+  display: block;
   color: var(--text);
   font: var(--font);
 }
 
+/* <wav-player page>: the player is the whole page. */
+:host([page]) {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 16px;
+  background: var(--page);
+}
+
+[hidden] { display: none !important; }
+
 .player {
+  visibility: visible;
   width: min(100%, var(--width, 420px));
+  margin: 0 auto;
   padding: var(--gap-large, 24px);
   display: grid;
   gap: var(--gap, 16px);
   background: var(--panel);
+  color: var(--text);
   border: var(--border, 0);
   border-radius: var(--radius);
   box-shadow: var(--shadow, none);

@@ -27,7 +27,7 @@ const { values: options } = parseArgs({
 const app = fileURLToPath(new URL('.', import.meta.url));
 const media = options.dir ? resolve(options.dir.replace(/^~(?=$|\/)/, homedir())) : null;
 
-const served = ['/index.html', '/src/', '/skins/'];
+const served = ['/index.html', '/embed.html', '/src/', '/skins/'];
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -58,7 +58,8 @@ const server = createServer(async (request, reply) => {
     if (!served.some((prefix) => wanted === prefix || (prefix.endsWith('/') && wanted.startsWith(prefix)))) {
       return text(reply, 404, 'Not found');
     }
-    return await file(request, reply, within(app, wanted.slice(1)));
+    // The app's own files are public source; other origins may load them to embed the player.
+    return await file(request, reply, within(app, wanted.slice(1)), { 'Access-Control-Allow-Origin': '*' });
   } catch (problem) {
     const missing = problem.code === 'ENOENT' || problem.code === 'EISDIR' || problem.code === 'ENOTDIR';
     const status = problem.status ?? (missing ? 404 : problem instanceof URIError ? 400 : 500);
@@ -107,13 +108,14 @@ function within(root, name) {
 }
 
 /** Sends a file, honouring Range so the browser can seek in long WAVs. */
-async function file(request, reply, path) {
+async function file(request, reply, path, extra = {}) {
   const info = await stat(path);
   if (!info.isFile()) throw Object.assign(new Error('Not found'), { status: 404 });
   const headers = {
     'Content-Type': types[extname(path).toLowerCase()] ?? 'application/octet-stream',
     'Accept-Ranges': 'bytes',
     'Cache-Control': 'no-cache',
+    ...extra,
   };
 
   let start = 0;
@@ -149,6 +151,12 @@ function text(reply, status, body) {
   reply.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8' });
   reply.end(body);
 }
+
+server.on('error', (problem) => {
+  if (problem.code !== 'EADDRINUSE') throw problem;
+  console.error(`Port ${options.port} is taken. Try: node server.js --port ${Number(options.port) + 1}`);
+  process.exit(1);
+});
 
 // Loopback only: this server reads files from disk and signs S3 addresses.
 server.listen(Number(options.port), '127.0.0.1', () => {

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Player</title>
+  <style>html, body { margin: 0; background: transparent; }</style>
+</head>
+<body>
+  <!-- For places that only take an iframe:
+
+         <iframe src="https://your.host/player/embed.html?src=https://…/kick.wav&skin=midnight"
+                 style="border:0; width:100%; max-width:460px; height:230px"></iframe>
+
+       src and title may repeat, one pair per track; skin is a skin's name;
+       editable lets the listener add tracks. Encode each src with encodeURIComponent. -->
+  <script type="module">
+    import './src/element.js';
+
+    const asked = new URLSearchParams(location.search);
+    const player = document.createElement('wav-player');
+    const skin = asked.get('skin');
+    if (skin && /^[\w-]+$/.test(skin)) player.setAttribute('skin', skin);
+    if (asked.has('editable')) player.setAttribute('editable', '');
+
+    const titles = asked.getAll('title');
+    asked.getAll('src').forEach((address, index) => {
+      const link = document.createElement('a');
+      link.setAttribute('href', address);
+      link.textContent = titles[index] ?? '';
+      player.append(link);
+    });
+    document.body.append(player);
+  </script>
+</body>
+</html>

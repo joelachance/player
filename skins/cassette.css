@@ -1,7 +1,7 @@
 /* Cassette: shows how far a skin can go. Properties first, then a few
    rules of its own on top of base.css. */
 
-:root {
+:host {
   --page: #d8cfb8;
   --panel: #f4ecd8;
   --text: #2a2118;

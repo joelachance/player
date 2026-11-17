@@ -13,17 +13,25 @@ export function fromFile(file) {
   };
 }
 
-/** A file in the folder the server was started with (`node server.js --dir`). */
-export function fromFolder(name) {
+/**
+ * A file in the folder the server was started with (`node server.js --dir`).
+ * `list` is the address the folder's listing came from.
+ */
+export function fromFolder(name, list) {
+  const path = `/media/${name.split('/').map(encodeURIComponent).join('/')}`;
   return {
     title: name,
     detail: 'Local folder',
-    url: () => `/media/${name.split('/').map(encodeURIComponent).join('/')}`,
+    url: () => new URL(path, list).href,
   };
 }
 
-/** Whatever was typed into the address box. Throws with a message fit to show. */
-export function fromAddress(text) {
+/**
+ * A full address: http(s) or s3://. Throws with a message fit to show.
+ * `signer` is the endpoint that presigns S3 addresses, if there is one;
+ * `title` replaces the file name.
+ */
+export function fromAddress(text, { signer, title } = {}) {
   const address = text.trim();
   if (!address) throw new Error('Type an address first');
   let parsed;
@@ -33,26 +41,29 @@ export function fromAddress(text) {
     throw new Error('That is not a full address');
   }
   if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-    return { title: basename(parsed.pathname) || parsed.host, detail: parsed.host, url: () => parsed.href };
+    return { title: title ?? (basename(parsed.pathname) || parsed.host), detail: parsed.host, url: () => parsed.href };
   }
-  if (parsed.protocol === 's3:') return fromS3(address);
+  if (parsed.protocol === 's3:') return fromS3(address, { signer, title });
   throw new Error(`Cannot play ${parsed.protocol}// addresses`);
 }
 
 /**
- * An object in S3, as s3://bucket/key. The local server signs a
- * short-lived address for it each time it starts playing; with no server
- * or no AWS credentials, the object is tried as a public one.
+ * An object in S3, as s3://bucket/key. With a signer, a short-lived
+ * address is signed for it each time it starts playing. With none, or
+ * one that has no AWS credentials, the object is tried as a public one.
  */
-export function fromS3(address) {
+export function fromS3(address, { signer, title } = {}) {
   const object = s3.parse(address);
   return {
-    title: basename(object.key),
+    title: title ?? basename(object.key),
     detail: `s3://${object.bucket}`,
     async url() {
+      if (!signer) return s3.open(object);
       let reply;
       try {
-        reply = await fetch(`/api/presign?uri=${encodeURIComponent(address.trim())}`);
+        const ask = new URL(signer, document.baseURI);
+        ask.searchParams.set('uri', address.trim());
+        reply = await fetch(ask);
       } catch {
         return s3.open(object);
       }
