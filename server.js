@@ -12,7 +12,7 @@ import { homedir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { credentials, presign, regionOf } from './lib/presign.js';
+import { credentials, forget, presign, refusal, regionOf } from './lib/presign.js';
 import * as s3 from './src/s3.js';
 
 const EXPIRES = 3600; // seconds a signed S3 address stays good
@@ -27,13 +27,14 @@ const { values: options } = parseArgs({
 const app = fileURLToPath(new URL('.', import.meta.url));
 const media = options.dir ? resolve(options.dir.replace(/^~(?=$|\/)/, homedir())) : null;
 
-const served = ['/index.html', '/embed.html', '/src/', '/skins/'];
+const served = ['/index.html', '/embed.html', '/src/', '/skins/', '/docs/'];
 const types = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
   '.wav': 'audio/wav',
   '.wave': 'audio/wav',
 };
@@ -77,10 +78,24 @@ async function sign(reply, uri) {
   } catch (problem) {
     return text(reply, 400, problem.message);
   }
-  const keys = await credentials();
+  let keys;
+  try {
+    keys = await credentials();
+  } catch (problem) {
+    return text(reply, 502, problem.message);
+  }
   if (!keys) return text(reply, 501, 'No AWS credentials on this machine');
   const region = await regionOf(object.bucket);
-  json(reply, 200, { url: presign({ ...object, region, credentials: keys, expires: EXPIRES }), expires: EXPIRES });
+  const url = presign({ ...object, region, credentials: keys, expires: EXPIRES });
+
+  // Try it before handing it over, so a refusal reaches the listener in words.
+  const why = await refusal(url, object);
+  if (why) {
+    forget();
+    console.error(`s3://${object.bucket}/${object.key}: ${why}`);
+    return text(reply, 502, why);
+  }
+  json(reply, 200, { url, expires: EXPIRES });
 }
 
 /** WAV files in the media folder, one level of subfolders deep. */

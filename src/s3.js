@@ -2,12 +2,58 @@
 
 const BUCKET = /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/;
 
-/** Splits "s3://bucket/path/to/take.wav" into { bucket, key }. Throws if it is not one. */
+/**
+ * Splits "s3://bucket/path/to/take.wav" into { bucket, key }. Also takes
+ * the ARN form, "arn:aws:s3:::bucket/path/to/take.wav". Throws otherwise.
+ */
 export function parse(address) {
-  const found = /^s3:\/\/([^/]+)\/(.+)$/.exec(address.trim());
+  const found = /^(?:s3:\/\/|arn:aws[\w-]*:s3:::)([^/]+)\/(.+)$/.exec(address.trim());
   if (!found) throw new Error('S3 addresses look like s3://bucket/path/file.wav');
   const [, bucket, key] = found;
   if (!BUCKET.test(bucket) || bucket.includes('..')) throw new Error(`"${bucket}" is not a bucket name`);
+  return { bucket, key };
+}
+
+/**
+ * The object an https address points at, if it is an unsigned S3 one:
+ * the "Object URL" or the browser address of the object's console page,
+ * which are what people usually have on the clipboard. Null otherwise,
+ * and null for an address that already carries a signature.
+ */
+export function locate(address) {
+  let url;
+  try {
+    url = new URL(address);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  if (url.searchParams.has('X-Amz-Signature') || url.searchParams.has('Signature')) return null;
+  // S3 reads "+" in a path as a space, and the console writes it that way.
+  const plain = (text) => decodeURIComponent(text.replace(/\+/g, ' '));
+  let bucket;
+  let key;
+  try {
+    const hosted = /^(.+)\.s3[.-](?:[a-z0-9-]+\.)?amazonaws\.com$/.exec(url.hostname);
+    if (hosted) {
+      bucket = hosted[1];
+      key = plain(url.pathname.slice(1));
+    } else if (/^s3[.-](?:[a-z0-9-]+\.)?amazonaws\.com$/.test(url.hostname)) {
+      const [, first, ...rest] = url.pathname.split('/');
+      bucket = first;
+      key = plain(rest.join('/'));
+    } else if (/(^|\.)console\.aws\.amazon\.com$/.test(url.hostname)) {
+      const page = /^\/s3\/object\/([^/]+)$/.exec(url.pathname);
+      if (!page) return null;
+      bucket = page[1];
+      key = url.searchParams.get('prefix') ?? '';
+    } else {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+  if (!key || !BUCKET.test(bucket) || bucket.includes('..')) return null;
   return { bucket, key };
 }
 

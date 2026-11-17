@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { presign } from '../lib/presign.js';
-import { open, parse } from '../src/s3.js';
+import { explain, presign } from '../lib/presign.js';
+import { locate, open, parse } from '../src/s3.js';
 
 // The worked example from the Amazon S3 documentation, "Authenticating
 // Requests: Using Query Parameters (AWS Signature Version 4)". The keys
@@ -53,4 +53,41 @@ test('S3 addresses parse, and bad ones are refused', () => {
   for (const bad of ['s3://takes', 's3://takes/', 's3://Bad_Bucket/a.wav', 's3://evil.com:80/a.wav', 'https://x/y.wav']) {
     assert.throws(() => parse(bad), bad);
   }
+});
+
+test('ARNs parse like s3:// addresses', () => {
+  assert.deepEqual(parse('arn:aws:s3:::takes/day 1/kick.wav'), { bucket: 'takes', key: 'day 1/kick.wav' });
+});
+
+test('pasted S3 web addresses are recognised', () => {
+  const kick = { bucket: 'takes', key: 'day 1/kick.wav' };
+  for (const address of [
+    'https://takes.s3.amazonaws.com/day+1/kick.wav',
+    'https://takes.s3.us-west-2.amazonaws.com/day%201/kick.wav',
+    'https://takes.s3-us-west-2.amazonaws.com/day%201/kick.wav',
+    'https://s3.us-west-2.amazonaws.com/takes/day%201/kick.wav',
+    'https://s3.amazonaws.com/takes/day%201/kick.wav',
+    'https://us-west-2.console.aws.amazon.com/s3/object/takes?region=us-west-2&prefix=day+1/kick.wav',
+    'https://s3.console.aws.amazon.com/s3/object/takes?region=us-west-2&prefix=day%201%2Fkick.wav',
+  ]) {
+    assert.deepEqual(locate(address), kick, address);
+  }
+  for (const address of [
+    'https://example.com/day/kick.wav',
+    'https://takes.s3.amazonaws.com/kick.wav?X-Amz-Signature=abc',
+    'https://takes.s3.amazonaws.com/',
+    'https://us-west-2.console.aws.amazon.com/s3/buckets/takes',
+    's3://takes/kick.wav',
+    'not an address',
+  ]) {
+    assert.equal(locate(address), null, address);
+  }
+});
+
+test('S3 refusals are put in words', () => {
+  const kick = { bucket: 'takes', key: 'kick.wav' };
+  assert.match(explain('AccessDenied', 'Access Denied', kick), /s3:GetObject/);
+  assert.match(explain('NoSuchKey', '', kick), /no "kick.wav" in bucket takes/);
+  assert.match(explain('ExpiredToken', '', kick), /aws sso login/);
+  assert.match(explain('SlowDown', 'Reduce your request rate', kick), /SlowDown \(Reduce your request rate\)/);
 });
