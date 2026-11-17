@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-// Serves the player on this machine only, and optionally a folder of WAV
-// files to play:
+// Serves the player on this machine only, optionally with a folder of WAV
+// files to play, and signs s3:// addresses with this machine's AWS
+// credentials so private objects can be played:
 //
 //   node server.js [--port 4173] [--dir ~/Music/takes]
 
@@ -11,6 +12,10 @@ import { homedir } from 'node:os';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
+import { credentials, presign, regionOf } from './lib/presign.js';
+import * as s3 from './src/s3.js';
+
+const EXPIRES = 3600; // seconds a signed S3 address stays good
 
 const { values: options } = parseArgs({
   options: {
@@ -36,11 +41,15 @@ const isWav = (name) => /\.wave?$/i.test(name);
 
 const server = createServer(async (request, reply) => {
   try {
+    // Only answer to our own name, so another site cannot reach this
+    // server (and its signing) by pointing a hostname at 127.0.0.1.
+    if (!/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(request.headers.host ?? '')) return text(reply, 403, 'Forbidden');
     const url = new URL(request.url, 'http://localhost');
     const path = decodeURIComponent(url.pathname);
     if (request.method !== 'GET' && request.method !== 'HEAD') return text(reply, 405, 'Method not allowed');
 
     if (path === '/api/local') return json(reply, 200, await listing());
+    if (path === '/api/presign') return await sign(reply, url.searchParams.get('uri') ?? '');
     if (path.startsWith('/media/')) {
       if (!media || !isWav(path)) return text(reply, 404, 'Not found');
       return await file(request, reply, within(media, path.slice('/media/'.length)));
@@ -58,6 +67,20 @@ const server = createServer(async (request, reply) => {
     else reply.destroy();
   }
 });
+
+/** A short-lived address for an s3:// object, signed with this machine's AWS credentials. */
+async function sign(reply, uri) {
+  let object;
+  try {
+    object = s3.parse(uri);
+  } catch (problem) {
+    return text(reply, 400, problem.message);
+  }
+  const keys = await credentials();
+  if (!keys) return text(reply, 501, 'No AWS credentials on this machine');
+  const region = await regionOf(object.bucket);
+  json(reply, 200, { url: presign({ ...object, region, credentials: keys, expires: EXPIRES }), expires: EXPIRES });
+}
 
 /** WAV files in the media folder, one level of subfolders deep. */
 async function listing() {
@@ -127,7 +150,7 @@ function text(reply, status, body) {
   reply.end(body);
 }
 
-// Loopback only: this server reads files from disk on request.
+// Loopback only: this server reads files from disk and signs S3 addresses.
 server.listen(Number(options.port), '127.0.0.1', () => {
   console.log(`Player: http://localhost:${server.address().port}`);
   if (media) console.log(`Folder: ${media}`);

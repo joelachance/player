@@ -92,7 +92,8 @@ export class Player extends EventTarget {
       await this.audio.play();
     } catch (cause) {
       if (attempt !== this.starting || cause?.name === 'AbortError') return;
-      this.#fail(cause?.message || 'Could not play this track');
+      // The browser's own wording for an unreadable source is opaque; ours says what to check.
+      this.#fail(cause?.name === 'NotSupportedError' ? describe({ code: 4 }) : cause?.message || 'Could not play this track');
     }
   }
 
